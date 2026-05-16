@@ -1,0 +1,116 @@
+---
+title: "Installation"
+description: "Get opendev set up and running"
+icon: "download"
+---
+
+## Quick install (recommended)
+
+### Via npm (any OS with Node 20+)
+
+```sh
+npm install -g opendevtool
+opendev --version
+```
+
+<Note>
+The package is named `opendevtool` on npm, but the binary installed is `opendev`. (The unqualified `opendev` name was taken on npm, but the tool's name stays the same.)
+</Note>
+
+### Via curl one-liner (Linux / macOS / WSL)
+
+Auto-detects your OS, installs Node 20 via nvm if missing, and sets up opendev:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/OpenSubmissionn/Open_DevTool/main/install.sh | sh
+opendev --version
+```
+
+<Warning>
+Windows users: the curl installer needs WSL, Git Bash, or PowerShell with curl. If you don't have any of those, use the npm method above or follow the [Windows manual install](#windows-powershell) below.
+</Warning>
+
+---
+
+## Manual install
+
+### Requirements
+
+- **Node.js 20+** (20 LTS recommended; some dependencies require Node 20+)
+- **git**
+- A terminal
+
+<Info>
+opendev is a monorepo with npm workspaces (cli, services, scripts). The steps below clone + build + install only the `cli/` package globally — the same flow the curl one-liner runs internally.
+</Info>
+
+### Linux (Ubuntu / Debian / Fedora / Arch)
+
+```bash
+# 1. Install Node 20 via nvm if you don't have it
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+source ~/.bashrc
+nvm install 20
+
+# 2. Clone, build, install
+git clone https://github.com/OpenSubmissionn/Open_DevTool.git
+cd Open_DevTool
+npm install
+npm run build --workspace cli
+cd cli && npm install -g . --ignore-scripts
+
+# 3. Verify
+opendev --help
+```
+
+### macOS
+
+```bash
+# 1. Install Node 20 via Homebrew if you don't have it
+brew install node@20
+echo 'export PATH="/opt/homebrew/opt/node@20/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+
+# 2. Clone, build, install (same as Linux)
+git clone https://github.com/OpenSubmissionn/Open_DevTool.git
+cd Open_DevTool
+npm install
+npm run build --workspace cli
+cd cli && npm install -g . --ignore-scripts
+
+# 3. Verify
+opendev --help
+```
+
+### Windows (PowerShell)
+
+```powershell
+# 1. Install Node 20 via winget if you don't have it
+winget install OpenJS.NodeJS.LTS
+# Restart PowerShell so PATH picks up node
+
+# 2. Clone, build, install
+git clone https://github.com/OpenSubmissionn/Open_DevTool.git
+cd Open_DevTool
+npm install
+npm run build --workspace cli
+cd cli
+npm install -g . --ignore-scripts
+
+# 3. Verify
+opendev --help
+```
+
+---
+
+## Build from source (contributors, hot-reload)
+
+For local development where code changes reflect on every run:
+
+```bash
+git clone https://github.com/OpenSubmissionn/Open_DevTool.git
+cd Open_DevTool
+npm install
+npm run build
+npm link    # makes `opendev` point at your working tree
+```

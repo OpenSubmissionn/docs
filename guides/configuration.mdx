@@ -1,0 +1,215 @@
+---
+title: "Configuration"
+description: "Configure opendev for your environment"
+icon: "sliders"
+---
+
+## RPC URLs
+
+### Set default RPC
+
+```bash
+opendev config set-rpc https://your-rpc.example.com
+```
+
+Then all `opendev tx` and `opendev simulate` commands use that RPC:
+
+```bash
+opendev tx <sig>    # uses custom RPC
+```
+
+### Override per-command
+
+```bash
+opendev tx <sig> --rpc https://another-rpc.example.com
+opendev tx <sig> --network devnet    # uses devnet RPC
+```
+
+<Tip>
+CLI flags (`--rpc`, `--network`) take precedence over the config.
+</Tip>
+
+### Environment variable
+
+```bash
+export OPEN_RPC_URL=https://your-rpc.example.com
+opendev tx <sig>
+```
+
+## Configuration file
+
+Persisted state lives in `~/.opendev/credentials.json`:
+
+```json
+{
+  "rpc": "https://your-rpc.example.com",
+  "keys": {
+    "groq": "gsk_...",
+    "anthropic": "sk-ant-..."
+  }
+}
+```
+
+**Permissions:** chmod 600 (user read/write only)
+
+### Custom credentials path
+
+Override the default location:
+
+```bash
+export OPENDEV_CREDS_PATH=/custom/path/creds.json
+opendev login
+```
+
+Useful for tests or isolated environments.
+
+---
+
+## AI provider configuration
+
+See [AI Insights](/guides/ai-insights) for detailed setup. Quick reference:
+
+```bash
+# Interactive setup
+opendev login              # defaults to groq
+opendev login anthropic    # use Anthropic
+
+# Programmatic setup
+opendev config set-key groq gsk_...
+opendev config set-key anthropic sk-ant-...
+
+# View configured keys (values masked)
+opendev config get-key
+
+# Remove a key
+opendev config remove-key groq
+
+# Use environment variables instead
+export GROQ_API_KEY=gsk_...
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+---
+
+## Advanced options
+
+### Custom endpoint for AI analysis
+
+```bash
+export MCP_ENDPOINT_URL=https://your-ai-service.example.com
+opendev tx <sig>
+```
+
+The CLI POSTs the analysis payload to your URL and uses the response.
+
+### Disable AI entirely
+
+```bash
+export MCP_DISABLED=1
+opendev tx <sig>    # rule-based insights only
+```
+
+### Override AI model
+
+```bash
+export MCP_MODEL=llama3-70b    # for Groq
+export MCP_MODEL=claude-3-opus  # for Anthropic
+opendev tx <sig>
+```
+
+### Optional: Helius API key
+
+For richer transaction parsing when available:
+
+```bash
+export HELIUS_API_KEY=your_key
+opendev tx <sig>
+```
+
+---
+
+## Network selection
+
+### Network flag (simplest)
+
+```bash
+opendev tx <sig> --network mainnet    # default
+opendev tx <sig> --network devnet
+```
+
+### RPC flag (most control)
+
+```bash
+opendev tx <sig> --rpc https://api.mainnet-beta.solana.com
+opendev tx <sig> --rpc https://api.devnet.solana.com
+```
+
+### Configuration (default for all commands)
+
+```bash
+opendev config set-rpc https://api.devnet.solana.com
+opendev tx <sig>    # uses devnet
+```
+
+<Note>
+Flags override configuration. So `opendev tx <sig> --network mainnet` will use mainnet even if `~/.opendev/credentials.json` specifies a devnet RPC.
+</Note>
+
+---
+
+## Examples
+
+### Local setup (development)
+
+```bash
+# Use devnet by default
+opendev config set-rpc https://api.devnet.solana.com
+
+# Set up Groq (free)
+opendev login
+
+# Now all commands default to devnet with AI insights
+opendev tx <sig>
+```
+
+### Production setup (CI)
+
+```bash
+# .env or CI secrets
+GROQ_API_KEY=gsk_...
+OPEN_RPC_URL=https://your-rpc.example.com
+HELIUS_API_KEY=...
+
+# Commands use these automatically
+opendev batch ./sigs.json --csv --output report.csv
+```
+
+### Testing (disable AI, custom RPC)
+
+```bash
+opendev tx <sig> \
+  --rpc http://localhost:8899 \
+  --no-cache \
+  --verbose
+```
+
+Then on the next run:
+
+```bash
+MCP_DISABLED=1 opendev tx <sig> --rpc http://localhost:8899
+```
+
+### Switching between networks
+
+```bash
+# Mainnet
+opendev tx <sig> --network mainnet
+
+# Devnet  
+opendev tx <sig> --network devnet
+
+# Custom
+opendev tx <sig> --rpc https://my-rpc.example.com
+```
+
+No need to reconfigure — just pass the flag.

@@ -1,0 +1,315 @@
+---
+title: "Source-file runners"
+description: "Execute TypeScript, Rust, and JavaScript to build transactions"
+icon: "code-merge"
+---
+
+## Overview
+
+`opendev simulate` accepts more than just base64 blobs — it can execute scripts that build transactions and pipe the output into the simulation pipeline.
+
+## Accepted inputs
+
+| Input | Detected as | Executed with |
+|---|---|---|
+| base64 string | `base64` | — (used as-is) |
+| `.b64` / `.json` (with `transaction` or `tx` field) | `path` | — (read from disk) |
+| `.ts` / `.mts` / `.cts` | `ts-source` | `npx -y tsx <file>` |
+| `.js` / `.mjs` / `.cjs` | `js-source` | `node <file>` |
+| `.rs` | `rust-source` | `cargo run --release` in nearest `Cargo.toml` |
+| Directory with `Cargo.toml` | `rust-source` | `cargo run --release` in that directory |
+
+---
+
+## Protocol
+
+Your script must **print the base64-serialized transaction on stdout**. The runner picks the last non-empty stdout line that matches the base64 alphabet and is at least 100 characters long.
+
+**Everything else is ignored** — logs, debug output, warnings, etc. — as long as it isn't the final line.
+
+### Example output
+
+```bash
+# Your script produces:
+Building transaction...
+Using blockhash: ...
+AEqF0U1XvWo2jGznBVUZ9PqVQ4Z...  # ← runner uses this line
+```
+
+---
+
+## TypeScript
+
+### Top-level await (`.mts`)
+
+The fastest path. The `.mts` extension forces ESM regardless of `package.json`:
+
+```typescript
+// build_tx.mts
+import {
+  Connection, Keypair, SystemProgram, TransactionMessage, VersionedTransaction,
+} from '@solana/web3.js';
+
+const connection = new Connection(process.env.RPC_URL ?? 'https://api.devnet.solana.com');
+const payer = Keypair.generate();
+const recipient = Keypair.generate();
+const { blockhash } = await connection.getLatestBlockhash();
+
+const msg = new TransactionMessage({
+  payerKey: payer.publicKey,
+  recentBlockhash: blockhash,
+  instructions: [
+    SystemProgram.transfer({
+      fromPubkey: payer.publicKey, toPubkey: recipient.publicKey, lamports: 1_000_000,
+    }),
+  ],
+}).compileToV0Message();
+
+const tx = new VersionedTransaction(msg);
+tx.sign([payer]);
+process.stdout.write(Buffer.from(tx.serialize()).toString('base64') + '\n');
+```
+
+Run it:
+
+```bash
+opendev simulate ./build_tx.mts --network devnet
+```
+
+### Plain `.ts` with async wrapper
+
+If you prefer `.ts` over `.mts` (to avoid confusion in your project), wrap the body:
+
+```typescript
+// build_tx.ts
+import {
+  Connection, Keypair, SystemProgram, TransactionMessage, VersionedTransaction,
+} from '@solana/web3.js';
+
+async function main() {
+  const connection = new Connection(process.env.RPC_URL ?? 'https://api.devnet.solana.com');
+  const payer = Keypair.generate();
+  const recipient = Keypair.generate();
+  const { blockhash } = await connection.getLatestBlockhash();
+
+  const msg = new TransactionMessage({
+    payerKey: payer.publicKey,
+    recentBlockhash: blockhash,
+    instructions: [
+      SystemProgram.transfer({
+        fromPubkey: payer.publicKey, toPubkey: recipient.publicKey, lamports: 1_000_000,
+      }),
+    ],
+  }).compileToV0Message();
+
+  const tx = new VersionedTransaction(msg);
+  tx.sign([payer]);
+  process.stdout.write(Buffer.from(tx.serialize()).toString('base64') + '\n');
+}
+
+main();
+```
+
+Run it:
+
+```bash
+opendev simulate ./build_tx.ts --network devnet
+```
+
+<Info>
+**Why wrap in `main()`?**
+`tsx` detects ESM vs CJS by walking up to the nearest `package.json`. If that file lacks `"type": "module"`, `tsx` emits CJS — and CJS doesn't support top-level `await`. Wrapping avoids this issue without modifying your project's `package.json`.
+</Info>
+
+---
+
+## Rust
+
+### Cargo.toml setup
+
+```toml
+[package]
+name = "build-tx"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+solana-sdk = "2.0"
+solana-client = "2.0"
+base64 = "0.22"
+bincode = "1.3"
+anyhow = "1"
+```
+
+### src/main.rs
+
+```rust
+use anyhow::Result;
+use base64::{engine::general_purpose::STANDARD, Engine};
+use solana_client::rpc_client::RpcClient;
+use solana_sdk::{
+    commitment_config::CommitmentConfig,
+    message::{v0, VersionedMessage},
+    pubkey::Pubkey,
+    signature::{Keypair, Signer},
+    system_instruction,
+    transaction::VersionedTransaction,
+};
+use std::str::FromStr;
+
+fn main() -> Result<()> {
+    let rpc = std::env::var("RPC_URL").unwrap_or_else(|_| "https://api.devnet.solana.com".into());
+    let client = RpcClient::new_with_commitment(rpc, CommitmentConfig::confirmed());
+    let payer = Keypair::new();
+    let recipient = Pubkey::from_str("9ZNTfG4NyQgxy2SWjSiQoUyBPEvXT2WaxfKHsKhXGqHV")?;
+    let ix = system_instruction::transfer(&payer.pubkey(), &recipient, 1_000_000);
+    let blockhash = client.get_latest_blockhash()?;
+    let msg = v0::Message::try_compile(&payer.pubkey(), &[ix], &[], blockhash)?;
+    let tx = VersionedTransaction::try_new(VersionedMessage::V0(msg), &[&payer])?;
+    println!("{}", STANDARD.encode(bincode::serialize(&tx)?));
+    Ok(())
+}
+```
+
+Run it:
+
+```bash
+opendev simulate ./build-tx --network devnet
+```
+
+Or point to the Cargo.toml:
+
+```bash
+opendev simulate ./src/main.rs --network devnet
+```
+
+<Warning>
+The first run is slow due to `cargo build`. Use `--exec-timeout 300` if you hit the 90-second default.
+</Warning>
+
+---
+
+## JavaScript
+
+Standard Node.js — `await` works without wrappers:
+
+```javascript
+// build_tx.mjs
+import { Connection, Keypair, SystemProgram, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
+
+const connection = new Connection(process.env.RPC_URL ?? 'https://api.devnet.solana.com');
+const payer = Keypair.generate();
+const recipient = Keypair.generate();
+const { blockhash } = await connection.getLatestBlockhash();
+
+const msg = new TransactionMessage({
+  payerKey: payer.publicKey,
+  recentBlockhash: blockhash,
+  instructions: [
+    SystemProgram.transfer({
+      fromPubkey: payer.publicKey, toPubkey: recipient.publicKey, lamports: 1_000_000,
+    }),
+  ],
+}).compileToV0Message();
+
+const tx = new VersionedTransaction(msg);
+tx.sign([payer]);
+process.stdout.write(Buffer.from(tx.serialize()).toString('base64') + '\n');
+```
+
+Run it:
+
+```bash
+opendev simulate ./build_tx.mjs --network devnet
+```
+
+---
+
+## Common pitfalls
+
+### TypeScript top-level await caveat
+
+`tsx` decides between CJS and ESM by checking the **nearest `package.json`**. If it lacks `"type": "module"`, `tsx` emits CJS — and **CJS doesn't support top-level `await`**.
+
+Three solutions (pick one):
+
+1. **Rename to `.mts`** (forces ESM):
+   ```bash
+   mv tx.ts tx.mts
+   ```
+
+2. **Add `"type": "module"` to `package.json`** (affects your entire project):
+   ```json
+   { "type": "module" }
+   ```
+
+3. **Wrap in `main()`** (recommended for most projects):
+   ```typescript
+   async function main() { /* ... */ }
+   main();
+   ```
+
+### WSL node_modules mismatch
+
+If your repo lives on `/mnt/c/...` and you switch between Windows and WSL, the `node_modules` installed under one OS won't work under the other. `esbuild`'s native binary is OS-specific.
+
+**Error:** `esbuild was installed for a different platform`
+
+**Quick fix:**
+```bash
+rm -rf node_modules package-lock.json && npm install
+```
+
+**Better:** Work in a native Linux filesystem (`~/dev/...`) in WSL — also 10–50× faster I/O.
+
+---
+
+## Safety
+
+`opendev simulate` shows a yellow `EXECUTING USER CODE` banner before running any script. This is intentional — source files can execute arbitrary code.
+
+### CI/safety mode
+
+```bash
+# Refuse to run any source files in CI
+opendev simulate ./tx.b64 --no-exec
+```
+
+If a source file is passed with `--no-exec`, the command fails rather than executing.
+
+---
+
+## Examples
+
+### Multi-stage transaction with Metaplex
+
+```typescript
+// build_with_metaplex.mts
+import { createMint, createAccount, mintTo } from '@solana/spl-token';
+import { Connection, Keypair } from '@solana/web3.js';
+
+const connection = new Connection('https://api.devnet.solana.com');
+const payer = Keypair.generate();
+
+// Build multi-instruction transaction
+const mint = await createMint(connection, payer, payer.publicKey, null, 6);
+const account = await createAccount(connection, payer, mint, payer.publicKey);
+const tx = await mintTo(connection, payer, mint, account, payer, 1_000_000);
+
+process.stdout.write(tx + '\n');
+```
+
+```bash
+opendev simulate ./build_with_metaplex.mts --network devnet --json
+```
+
+### From a GitHub checkout
+
+```bash
+# Clone a repo with a Rust transaction builder
+git clone https://github.com/user/tx-builder.git
+cd tx-builder
+
+# Simulate without installing globally
+opendev simulate . --network devnet --verbose
+```

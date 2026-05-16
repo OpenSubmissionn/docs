@@ -1,0 +1,130 @@
+---
+title: "Project structure"
+description: "Understand the opendev codebase layout"
+icon: "folder-tree"
+---
+
+## Directory layout
+
+```
+opendev/
+├── cli/        # CLI entry point and terminal renderer
+├── services/   # Analysis engine, RPC layer, decoders
+├── scripts/    # Validation and benchmark scripts
+├── docs/       # Architecture, troubleshooting, schema references
+└── web/        # Web frontend (work in progress)
+```
+
+---
+
+## CLI (`cli/`)
+
+Entry point and terminal user interface.
+
+- **`bin/`** — executable entry point
+- **`src/`** — command implementations (tx, simulate, batch, config, login)
+- **`dist/`** — compiled output (tsup bundle)
+
+**Output:** Single `open.js` bundle, installed globally as `opendev`
+
+---
+
+## Services (`services/`)
+
+Analysis engine and supporting utilities.
+
+- **Analysis engine** — CPI tree building, compute unit tracking, state diffs
+- **RPC layer** — Solana RPC client wrappers
+- **Decoders** — Program-specific instruction/state decoders
+- **IDL cache** — Local cache of program IDLs
+- **AI integration** — MCP client for LLM calls
+
+---
+
+## Scripts (`scripts/`)
+
+Validation and benchmarking.
+
+- **`validate-decoders.ts`** — Verify decoder coverage
+- **`benchmark.ts`** — Performance and latency tests
+- **`audit.ts`** — Supply chain and dependency checks
+
+Run before opening PRs:
+
+```bash
+npm run test:all
+npm run validate:decoders
+npm run audit:prod
+```
+
+---
+
+## Docs (`docs/`)
+
+Developer documentation.
+
+| File | Topic |
+|------|-------|
+| [Architecture](https://github.com/OpenSubmissionn/Open_DevTool/blob/main/docs/Architecture_OPEN.md) | System architecture and data flow |
+| [Use Cases](https://github.com/OpenSubmissionn/Open_DevTool/blob/main/docs/Use_Cases.md) | Real-world usage scenarios |
+| [Troubleshooting](https://github.com/OpenSubmissionn/Open_DevTool/blob/main/docs/Troubleshooting.md) | Common errors and fixes |
+| [AI Insights](https://github.com/OpenSubmissionn/Open_DevTool/blob/main/docs/AI_Insights.md) | Prompt sources, insight ranking, MCP format |
+| [Decoders](https://github.com/OpenSubmissionn/Open_DevTool/blob/main/docs/Decoders.md) | Program registry schema, adding decoders |
+| [Anomaly Detection](https://github.com/OpenSubmissionn/Open_DevTool/blob/main/docs/Anomaly_Detection.md) | Spam / MEV-like / nondeterministic-failure detection |
+| [Performance & Quality](https://github.com/OpenSubmissionn/Open_DevTool/blob/main/docs/Performance_and_Quality.md) | Latency benchmarks, test coverage |
+
+---
+
+## Web (`web/`)
+
+Web frontend (work in progress).
+
+- Live transaction analysis interface
+- Hosted at [opendev-tx-solana.vercel.app](https://opendev-tx-solana.vercel.app)
+
+---
+
+## Workspaces
+
+This is an npm monorepo. Install dependencies once at the root:
+
+```bash
+npm install
+npm run build
+```
+
+To build a single workspace:
+
+```bash
+npm run build --workspace cli
+npm run build --workspace services
+```
+
+---
+
+## Build artifacts
+
+After `npm run build`:
+
+```
+dist/
+├── open.js           # CLI bundle (installed globally)
+├── services/
+│   ├── analysis/     # Analysis engine bundle
+│   └── decoders/     # Decoder plugins
+└── web/              # Web build (Next.js output)
+```
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](https://github.com/OpenSubmissionn/Open_DevTool/blob/main/CONTRIBUTING.md).
+
+Before opening a PR:
+
+```bash
+npm run test:all              # Run all tests
+npm run validate:decoders     # Verify decoders
+npm audit --omit=dev          # Check prod dependencies (should be 0 vulns)
+```

@@ -1,0 +1,388 @@
+---
+title: "Troubleshooting"
+description: "Common issues and solutions"
+icon: "triangle-exclamation"
+---
+
+## Installation issues
+
+### `command not found: opendev`
+
+**Cause:** CLI not installed globally or PATH not updated.
+
+**Solutions:**
+
+1. **Verify npm install succeeded:**
+   ```bash
+   npm list -g opendevtool
+   ```
+
+2. **Re-install globally:**
+   ```bash
+   npm install -g opendevtool
+   ```
+
+3. **Restart your terminal** to pick up PATH changes.
+
+4. **Check npm prefix:**
+   ```bash
+   npm config get prefix
+   # Add this to ~/.bashrc / ~/.zshrc / $PROFILE:
+   export PATH="$(npm config get prefix)/bin:$PATH"
+   ```
+
+### Module not found errors during build
+
+**Cause:** Monorepo dependencies not installed.
+
+**Solution:**
+
+```bash
+cd Open_DevTool
+npm install              # install workspace deps
+npm run build            # build all packages
+npm link                 # for local dev
+```
+
+---
+
+## RPC and network issues
+
+### `ECONNREFUSED` / network timeout
+
+**Cause:** RPC endpoint down or unreachable.
+
+**Solutions:**
+
+1. **Check RPC status:**
+   ```bash
+   curl https://api.mainnet-beta.solana.com
+   ```
+
+2. **Try a different RPC:**
+   ```bash
+   opendev tx <sig> --rpc https://api.solana.com
+   ```
+
+3. **Configure a persistent RPC:**
+   ```bash
+   opendev config set-rpc https://your-rpc.example.com
+   ```
+
+### `Signature not found`
+
+**Cause:** Signature doesn't exist, wrong network, or not finalized yet.
+
+**Solutions:**
+
+1. **Confirm network:**
+   ```bash
+   opendev tx <sig> --network devnet    # if it's a devnet tx
+   ```
+
+2. **Check on Solscan:**
+   Visit [solscan.io](https://solscan.io) and paste the signature to verify.
+
+3. **Wait for finalization:**
+   Transactions need a few seconds to finalize. Try again in 5 seconds.
+
+---
+
+## Decoder and program issues
+
+### `Unknown program` in output
+
+**Cause:** Program has no decoder registered.
+
+**Solutions:**
+
+1. **Check coverage:**
+   ```bash
+   opendev info
+   ```
+
+2. **Request a decoder:**
+   Open an issue on [GitHub](https://github.com/OpenSubmissionn/Open_DevTool) with the program pubkey.
+
+3. **Use generic IDL decoder:**
+   If the program has an onchain IDL, opendev will try to decode generically.
+
+### `IDL not found` warning
+
+**Cause:** Program lacks an IDL on chain.
+
+**Solutions:**
+
+1. **Provide the IDL manually:**
+   Some programs don't publish IDLs. Check the program's repo or docs.
+
+2. **Skip caching:**
+   ```bash
+   opendev tx <sig> --no-cache
+   ```
+
+---
+
+## Simulation issues
+
+### `EXECUTING USER CODE` banner but no error
+
+**Cause:** Script ran but didn't output base64.
+
+**Solutions:**
+
+1. **Verify output:**
+   Run your script directly and check the last stdout line:
+   ```bash
+   npx -y tsx ./build_tx.ts | tail -1
+   cargo run --release | tail -1
+   ```
+
+2. **Output format:**
+   Base64 must be on the **last non-empty line**, ≥100 characters.
+
+3. **Use intermediate file:**
+   ```bash
+   npx -y tsx ./build_tx.ts > /tmp/tx.b64
+   opendev simulate /tmp/tx.b64
+   ```
+
+### `esbuild was installed for a different platform` (WSL)
+
+**Cause:** `node_modules` built on Windows but running in WSL (or vice versa).
+
+**Solution:**
+
+```bash
+rm -rf node_modules package-lock.json
+npm install
+npm run build
+```
+
+Better: Work in a native Linux filesystem (`~/dev/...`) when using WSL.
+
+### `Top-level await is currently not supported with the "cjs" output format`
+
+**Cause:** TypeScript file uses top-level `await` with `.ts` extension.
+
+**Solutions (pick one):**
+
+1. **Rename to `.mts`:**
+   ```bash
+   mv tx.ts tx.mts
+   opendev simulate ./tx.mts
+   ```
+
+2. **Wrap in `main()`:**
+   ```typescript
+   async function main() {
+     // your code
+   }
+   main();
+   ```
+
+3. **Add `"type": "module"` to `package.json`** (affects whole project).
+
+### `exec timeout exceeded`
+
+**Cause:** Source file execution (cargo build, npm install, etc.) took too long.
+
+**Solution:**
+
+```bash
+opendev simulate ./build_tx.rs --exec-timeout 300
+```
+
+First Rust build is slow; 300 seconds is safer.
+
+---
+
+## AI insights issues
+
+### No AI suggestions appearing
+
+**Cause:** API key not configured or invalid.
+
+**Solutions:**
+
+1. **Check what's configured:**
+   ```bash
+   opendev config get-key    # lists keys (values masked)
+   ```
+
+2. **Set up AI:**
+   ```bash
+   opendev login              # interactive setup
+   opendev config set-key groq gsk_...    # manual
+   ```
+
+3. **Verify key is active:**
+   Check the provider's dashboard (console.groq.com / console.anthropic.com).
+
+### `Invalid API key` error
+
+**Cause:** Key format wrong or expired.
+
+**Solutions:**
+
+1. **Verify key format:**
+   - Groq: should start with `gsk_...`
+   - Anthropic: should start with `sk-ant-...`
+
+2. **Regenerate key:**
+   - Log into provider's dashboard
+   - Delete old key
+   - Create a new one
+   - Update opendev:
+     ```bash
+     opendev config remove-key groq
+     opendev login groq
+     ```
+
+### Provider quota exceeded
+
+**Cause:** Hit usage limits (common on Groq free tier).
+
+**Solutions:**
+
+1. **Switch provider:**
+   ```bash
+   opendev login anthropic    # requires $5+ paid account
+   ```
+
+2. **Wait for quota reset:**
+   Groq's free tier resets daily.
+
+3. **Use rule-based only:**
+   ```bash
+   MCP_DISABLED=1 opendev tx <sig>
+   ```
+
+---
+
+## Performance issues
+
+### Slow analysis (>5 seconds for single tx)
+
+**Cause:** Large transaction, slow RPC, or network latency.
+
+**Solutions:**
+
+1. **Check RPC latency:**
+   ```bash
+   time curl https://api.mainnet-beta.solana.com
+   ```
+
+2. **Use faster RPC:**
+   ```bash
+   opendev tx <sig> --rpc https://your-fast-rpc.example.com
+   ```
+
+3. **Enable cache:**
+   By default, IDL cache is on. Verify:
+   ```bash
+   ls ~/.opendev/
+   ```
+
+4. **Run batch analysis offline:**
+   Cache IDLs once, then batch:
+   ```bash
+   opendev batch ./sigs.json --csv --output report.csv
+   ```
+
+### High memory usage
+
+**Cause:** Large CPI trees or many accounts.
+
+**Solution:**
+
+```bash
+# Limit to JSON output (no formatting overhead)
+opendev tx <sig> --json > /tmp/analysis.json
+```
+
+---
+
+## Configuration issues
+
+### `credentials.json` permission error
+
+**Cause:** File has wrong permissions.
+
+**Solution:**
+
+```bash
+chmod 600 ~/.opendev/credentials.json
+```
+
+### Wrong RPC being used
+
+**Cause:** Multiple RPC sources in conflict.
+
+**Debug order (highest to lowest precedence):**
+
+1. **CLI flag:**
+   ```bash
+   opendev tx <sig> --rpc https://...    # overrides everything
+   ```
+
+2. **Environment variable:**
+   ```bash
+   echo $OPEN_RPC_URL
+   ```
+
+3. **Credentials file:**
+   ```bash
+   cat ~/.opendev/credentials.json
+   ```
+
+4. **Default:**
+   mainnet
+
+**Reset to defaults:**
+
+```bash
+rm ~/.opendev/credentials.json
+opendev login    # re-configure
+```
+
+---
+
+## General debugging
+
+### Enable verbose output
+
+```bash
+opendev tx <sig> --verbose
+```
+
+Shows per-stage timing and debug info.
+
+### Check CLI version
+
+```bash
+opendev --version
+```
+
+### Check installed packages
+
+```bash
+npm list -g opendevtool
+```
+
+### See all configuration
+
+```bash
+opendev config get-key         # AI keys
+echo $OPEN_RPC_URL              # RPC env var
+cat ~/.opendev/credentials.json # config file
+```
+
+---
+
+## Still stuck?
+
+1. **Search GitHub issues:** [OpenSubmissionn/Open_DevTool](https://github.com/OpenSubmissionn/Open_DevTool/issues)
+2. **Check architecture docs:** See [Project Structure](./project-structure.mdx)
+3. **Enable verbose mode:** `opendev --verbose`
+4. **Open an issue:** Include `opendev --version`, full command, and output

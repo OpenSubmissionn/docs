@@ -1,0 +1,220 @@
+---
+title: "CLI Commands"
+description: "Complete reference for all opendev commands"
+icon: "terminal"
+---
+
+## Command overview
+
+| Command | Description |
+|---------|-------------|
+| `opendev tx <signature>` | Full analysis of a confirmed transaction |
+| `opendev simulate <input>` | Simulate an unsigned transaction (base64 blob, file path, or source file) |
+| `opendev batch <file>` | Run analysis over a list of signatures from a JSON file |
+| `opendev info` | Show registered programs, decoder status, and coverage |
+| `opendev login [provider]` | Browser-assisted setup for AI insights (default: groq) |
+| `opendev config set-key <provider> <key>` | Save an AI provider API key from a script |
+| `opendev config get-key [provider]` | List configured keys (values masked) and their source |
+| `opendev config remove-key <provider>` | Delete a key from the credential store |
+| `opendev config set-rpc <url>` | Set the default Solana RPC URL |
+
+Run `opendev <command> --help` for the full flag list for each command.
+
+---
+
+## tx — Analyze a transaction
+
+Fetch and analyze a confirmed Solana transaction on the blockchain.
+
+```bash
+opendev tx <signature> [options]
+```
+
+### Examples
+
+```bash
+# Mainnet (default)
+opendev tx 4W8cbHAkjJC3jKdFY39JFXtTakf5JK9rz6jyGPbbpKEqhweRYzwjveZasFin46WuApDeLoQRHieG3t5b3T7VXMRR
+
+# Devnet with JSON output
+opendev tx <signature> --network devnet --json
+
+# Custom RPC
+opendev tx <signature> --rpc https://your-rpc.example.com --json
+```
+
+---
+
+## simulate — Test unsigned transactions
+
+Run a transaction simulation without on-chain confirmation.
+
+```bash
+opendev simulate <input> [options]
+```
+
+### Input types
+
+| Input | Treated as | Example |
+|-------|-----------|---------|
+| base64 string | `base64` | `AEqF0U1X...` |
+| `.b64` / `.json` file | `path` | `./tx.b64` or `./tx.json` |
+| `.ts` / `.mts` / `.cts` file | `ts-source` | `./build_tx.ts` |
+| `.js` / `.mjs` / `.cjs` file | `js-source` | `./build_tx.js` |
+| `.rs` file | `rust-source` | `./build_tx.rs` |
+| Directory with `Cargo.toml` | `rust-source` | `./my-rust-proj` |
+
+### Examples
+
+```bash
+# Base64 blob
+opendev simulate AEqF0U1X... --network devnet
+
+# From file
+opendev simulate ./sample-tx.b64
+
+# From TypeScript source
+opendev simulate ./build_tx.ts --network devnet
+
+# From Rust project
+opendev simulate ./build-tx
+```
+
+<Warning>
+Shows a yellow `EXECUTING USER CODE` banner before running source files. Use `--no-exec` if you want to refuse source-file input (useful in CI).
+</Warning>
+
+---
+
+## batch — Process multiple transactions
+
+Analyze a list of signatures from a JSON file.
+
+```bash
+opendev batch <file> [options]
+```
+
+### Input format
+
+```json
+{
+  "network": "mainnet",
+  "signatures": [
+    "4W8cbHAkjJC3jKdFY39JFXtTakf5JK9rz6jyGPbbpKEqhweRYzwjveZasFin46WuApDeLoQRHieG3t5b3T7VXMRR",
+    "..."
+  ]
+}
+```
+
+### Examples
+
+```bash
+# CSV output
+opendev batch ./signatures.json --csv --output batch-report.csv
+
+# JSON output (one object per line)
+opendev batch ./signatures.json --json > results.jsonl
+```
+
+---
+
+## info — Program coverage
+
+Display supported programs and decoder status.
+
+```bash
+opendev info
+```
+
+Shows:
+- List of registered programs
+- Decoder availability for each
+- Overall coverage statistics
+
+---
+
+## login — Set up AI insights
+
+Interactive setup for AI-powered optimization suggestions.
+
+```bash
+opendev login [provider]
+```
+
+### Providers
+
+| Provider | Setup |
+|----------|-------|
+| `groq` (default) | [console.groq.com/keys](https://console.groq.com/keys) — no credit card required |
+| `anthropic` | [console.anthropic.com](https://console.anthropic.com) — $5 minimum top-up |
+
+### Flow
+
+1. Opens provider's key page in your browser
+2. Prompts you to paste the key (input is masked)
+3. Validates against the provider's API
+4. Saves to `~/.opendev/credentials.json` (chmod 600)
+
+### Examples
+
+```bash
+opendev login              # defaults to groq
+opendev login anthropic    # use Anthropic instead
+```
+
+---
+
+## config — Manage configuration
+
+Store API keys, RPC URLs, and other settings.
+
+```bash
+opendev config <subcommand> [arguments]
+```
+
+### Subcommands
+
+#### set-key
+
+Save an API key for an AI provider:
+
+```bash
+opendev config set-key groq gsk_...
+opendev config set-key anthropic sk-ant-...
+```
+
+#### get-key
+
+List all configured keys (values are masked):
+
+```bash
+opendev config get-key [provider]
+```
+
+#### remove-key
+
+Delete a key from storage:
+
+```bash
+opendev config remove-key groq
+```
+
+#### set-rpc
+
+Set the default Solana RPC URL:
+
+```bash
+opendev config set-rpc https://your-rpc.example.com
+```
+
+---
+
+## Help
+
+Get help for any command:
+
+```bash
+opendev --help          # top-level help
+opendev tx --help       # tx command help
+opendev batch --help    # batch command help
+```

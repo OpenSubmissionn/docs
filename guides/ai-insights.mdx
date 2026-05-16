@@ -1,0 +1,234 @@
+---
+title: "AI Insights"
+description: "Set up AI-powered optimization suggestions"
+icon: "wand-magic-sparkles"
+---
+
+## Overview
+
+opendev ships **rule-based insights out of the box**. For AI-generated optimization suggestions, you need an API key from one of:
+
+| Provider | Free tier | Setup | Get a key |
+|----------|-----------|-------|-----------|
+| **Groq** (recommended) | ✅ no credit card | Fastest setup | [console.groq.com/keys](https://console.groq.com/keys) |
+| **Anthropic** | ❌ $5 minimum | Premium quality | [console.anthropic.com](https://console.anthropic.com) |
+
+---
+
+## Quick setup (browser-assisted)
+
+The fastest path:
+
+```bash
+opendev login              # defaults to groq
+opendev login anthropic    # if you have a paid key
+```
+
+This:
+1. Opens the provider's key page in your browser
+2. Prompts you to paste the key (input is masked)
+3. Validates against the provider's API
+4. Saves to `~/.opendev/credentials.json` (chmod 600)
+
+---
+
+## Programmatic setup (CI / dotfiles)
+
+For automated environments:
+
+```bash
+# Set keys
+opendev config set-key groq gsk_...
+opendev config set-key anthropic sk-ant-...
+
+# View what's configured (values are masked)
+opendev config get-key
+
+# Remove a key
+opendev config remove-key groq
+```
+
+---
+
+## Environment variables
+
+If you prefer not to install anything new:
+
+```bash
+export GROQ_API_KEY=gsk_...
+export ANTHROPIC_API_KEY=sk-ant-...
+opendev tx <sig>
+```
+
+Both keys stay in your shell — they're checked before the credentials file.
+
+---
+
+## Resolution order (AI keys)
+
+When you run `opendev`, keys are searched in this order:
+
+1. **Shell exports**
+   ```bash
+   export GROQ_API_KEY=...
+   export ANTHROPIC_API_KEY=...
+   ```
+
+2. **`.env` in the installation directory**
+   ```bash
+   # ~/.opendev/.env (if you manually created one)
+   GROQ_API_KEY=gsk_...
+   ```
+
+3. **`~/.opendev/credentials.json`**
+   Saved by `opendev login` or `opendev config set-key`
+
+4. **None** — only rule-based insights available
+
+Earlier sources override later ones. CLI flags take precedence over all.
+
+---
+
+## What AI insights include
+
+When a key is configured, `opendev tx` shows:
+
+- **AI-generated optimization suggestions** — custom recommendations based on the transaction structure
+- **Provider in use** — CLI logs which one at the start of each run
+- **Same shape from both** — Groq and Anthropic return the same structured format
+
+Without any key, you still get:
+
+- **Rule-based insights** — deterministic anomaly detection, nondeterministic-failure warnings, MEV-like patterns, etc.
+
+---
+
+## Custom endpoints (power users)
+
+Override the AI endpoint entirely:
+
+```bash
+export MCP_ENDPOINT_URL=https://your-endpoint.example.com
+opendev tx <sig>
+```
+
+The CLI POSTs the analysis payload to your URL and uses the response.
+
+---
+
+## Disabling AI
+
+Skip AI entirely (useful for debugging or low-latency runs):
+
+```bash
+export MCP_DISABLED=1
+opendev tx <sig>    # rule-based insights only
+```
+
+---
+
+## Model override
+
+Use a different model than the provider's default:
+
+```bash
+export MCP_MODEL=llama3-70b    # for Groq
+export MCP_MODEL=claude-3-opus  # for Anthropic
+opendev tx <sig>
+```
+
+---
+
+## Troubleshooting
+
+### Invalid key error
+
+If you get "Invalid API key" or auth errors:
+
+1. Double-check the key format (should start with `gsk_...` for Groq, `sk-ant-...` for Anthropic)
+2. Confirm the key is active in the provider's dashboard
+3. Clear and re-enter:
+
+```bash
+opendev config remove-key groq
+opendev login groq    # re-authenticate
+```
+
+### No key found
+
+If AI suggestions don't appear:
+
+```bash
+opendev config get-key    # lists configured keys (values masked)
+```
+
+If it's empty:
+
+1. Run `opendev login` or `opendev config set-key`
+2. Or set `GROQ_API_KEY` / `ANTHROPIC_API_KEY` in your shell
+
+### Provider quota exceeded
+
+Groq's free tier has usage limits. If you hit them:
+
+- Switch to Anthropic (requires $5+ top-up)
+- Or wait for the quota to reset
+- Or switch to `--disable-ai` for rule-based only
+
+---
+
+## Best practices
+
+1. **Use Groq for development** — free, fast, no credit card
+2. **Save to credentials file** — use `opendev login` or `opendev config set-key`
+3. **Pin in CI** — set via environment variables in your CI/CD secrets
+4. **Rotate keys regularly** — delete old keys from the provider's dashboard
+5. **Use `--verbose`** — to see timing and which provider is active:
+
+```bash
+opendev tx <sig> --verbose
+```
+
+---
+
+## Examples
+
+### Interactive setup
+
+```bash
+# First time: browser-assisted
+opendev login
+
+# Verify
+opendev tx 4W8cbHAkjJC3jKdFY39JFXtTakf5JK9rz6jyGPbbpKEqhweRYzwjveZasFin46WuApDeLoQRHieG3t5b3T7VXMRR --verbose
+```
+
+### Automated setup (script / dotfiles)
+
+```bash
+# .bashrc or equivalent
+export GROQ_API_KEY=$(cat ~/.secrets/groq-key)
+
+# Then in your script
+opendev batch ./signatures.json --csv --output report.csv
+```
+
+### CI/CD (GitHub Actions example)
+
+```yaml
+env:
+  GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+script:
+  opendev batch ./sigs.json --csv --output report.csv
+```
+
+### Disable AI for specific runs
+
+```bash
+# Rule-based insights only
+MCP_DISABLED=1 opendev tx <sig>
+
+# Or with custom endpoint
+MCP_ENDPOINT_URL=http://localhost:3000/analyze opendev tx <sig>
+```

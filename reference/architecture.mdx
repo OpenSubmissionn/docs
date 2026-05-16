@@ -1,0 +1,238 @@
+---
+title: "Architecture"
+description: "System design and data flow"
+icon: "sitemap"
+---
+
+## High-level overview
+
+opendev takes a Solana transaction signature and produces a decoded execution profile:
+
+```
+Input: Transaction signature
+   ↓
+[Fetch from RPC] → [Parse & decode] → [Build CPI tree] → [Analyze compute]
+   ↓
+[Account state diffs] → [Rule-based insights] → [Optional: AI insights]
+   ↓
+Output: Structured analysis (JSON/CSV/human-readable)
+```
+
+---
+
+## Data flow
+
+### 1. Fetch
+
+**Input:** Transaction signature  
+**Output:** On-chain transaction data + metadata
+
+```
+Signature → RPC call → VersionedTransaction + block info
+```
+
+- Supports mainnet, devnet, custom RPC
+- Optional IDL cache (speedup for repeat analysis)
+
+### 2. Parse & decode
+
+**Input:** Raw transaction bytes  
+**Output:** Decoded instructions, account state
+
+```
+Parsed VersionedTransaction
+  ├── Instructions (decoded per program)
+  ├── Signers
+  ├── Account list (with state before/after)
+  └── Compute units used
+```
+
+Each program has a **decoder** (custom logic or generic IDL-based).
+
+### 3. CPI call tree
+
+**Input:** Decoded instructions  
+**Output:** Hierarchical call tree
+
+```
+Main instruction (e.g., SystemProgram.transfer)
+  ├─ CPI call 1
+  │  ├─ CPI call 1.1
+  │  └─ CPI call 1.2
+  └─ CPI call 2
+```
+
+Built by tracking `invoke_signed` / `invoke` during simulation.
+
+### 4. Compute & gas analysis
+
+**Input:** CPI tree + instruction costs  
+**Output:** Per-instruction and aggregate compute units
+
+```
+Main: 200 CU
+  ├─ CPI 1: 150 CU
+  │  ├─ Nested 1.1: 50 CU
+  │  └─ Nested 1.2: 100 CU
+  └─ CPI 2: 80 CU
+```
+
+---
+
+## Account state tracking
+
+Before/after state for every account touched:
+
+```json
+{
+  "account": "TokenkegQfeZyiNwAJsyFbPVwwQQfNrPrxTWvDiZvej",
+  "before": {
+    "lamports": 5000000,
+    "data": "...",
+    "owner": "..."
+  },
+  "after": {
+    "lamports": 4900000,
+    "data": "...",
+    "owner": "..."
+  },
+  "delta": { "lamports": -100000 }
+}
+```
+
+---
+
+## Decoder registry
+
+Programs are matched to decoders by pubkey:
+
+```
+Solana program (e.g., Token program)
+  ↓
+Registry lookup
+  ├─ Custom decoder (hardcoded per program)
+  └─ Fallback: IDL-based generic decoder
+```
+
+### Custom decoders
+
+Programs like Token, Swap, and Stake have hand-written decoders for rich output.
+
+### IDL decoders
+
+Generic IDL-based decoder for any program with an onchain IDL.
+
+---
+
+## Rule-based insights
+
+Deterministic analysis of the transaction (no AI required):
+
+- **Anomaly detection** — unusual account access patterns, spam-like behavior
+- **MEV detection** — front-running signatures, sandwich attack indicators
+- **Nondeterministic failures** — execution paths that might fail under different slot conditions
+- **Compute warnings** — approaching limit or inefficient patterns
+
+Always available. AI insights augment these with LLM-generated suggestions.
+
+---
+
+## AI insights (optional)
+
+Integration with Groq / Anthropic for optimization suggestions.
+
+**Flow:**
+
+```
+Rule-based insights + decoded transaction
+  ↓
+Format into prompt
+  ↓
+Send to AI provider (Groq / Anthropic)
+  ↓
+Parse response
+  ↓
+Merge with rule-based insights
+  ↓
+Render in output
+```
+
+**MCP (Model Context Protocol):**
+
+Used for standardized communication with LLMs. See [AI Insights docs](../guides/ai-insights.mdx) for setup.
+
+---
+
+## Simulation
+
+`opendev simulate` re-executes a transaction offline:
+
+```
+Source file (TypeScript/Rust/JS)
+  ↓
+Runner executes it → base64 blob
+  ↓
+Simulation pipeline (same as `opendev tx`)
+  ↓
+Decoded execution profile
+```
+
+Uses:
+- `sigVerify: false` — skip signature validation
+- `replaceRecentBlockhash: true` — use fake blockhash
+- Current mainnet state (by default)
+
+---
+
+## CLI architecture
+
+```
+opendev <command> [args] [flags]
+  ↓
+Parse command + flags
+  ↓
+Load config (~/.opendev/credentials.json)
+  ↓
+Execute command logic
+  ├─ tx: fetch + analyze
+  ├─ simulate: parse input + analyze
+  ├─ batch: loop over signatures
+  ├─ config: manage credentials
+  └─ login: browser + validate
+  ↓
+Format output (JSON/CSV/human-readable)
+  ↓
+Write to stdout / file
+```
+
+---
+
+## Performance characteristics
+
+- **Mainnet tx:** ~1–3s (network + decode + analysis)
+- **Simulation:** ~100–500ms (depends on source file execution time)
+- **Batch:** Linear in number of transactions (parallelizable)
+- **IDL cache:** Cuts repeat analysis by ~40%
+
+See [Performance & Quality](https://github.com/OpenSubmissionn/Open_DevTool/blob/main/docs/Performance_and_Quality.md) for detailed benchmarks.
+
+---
+
+## Dependency design
+
+**Production (installed globally):**
+
+- `@solana/web3.js` — RPC client, transaction parsing
+- `@solana/spl-token` — token program utilities
+- Small, vetted set for security
+
+**Dev-only:**
+
+- Testing frameworks, type definitions, build tools
+- Never shipped in the published bundle
+
+**Audit:**
+
+```bash
+npm audit --omit=dev    # should be 0 vulnerabilities
+```

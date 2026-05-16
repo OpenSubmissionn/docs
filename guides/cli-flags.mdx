@@ -1,0 +1,198 @@
+---
+title: "CLI Flags"
+description: "All available command-line options"
+icon: "sliders"
+---
+
+## Global flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--json` | boolean | false | Output full analysis as JSON |
+| `--csv` | boolean | false | Output a CSV row (writes to a file by default) |
+| `--output <path>` | string | — | Save output to a specific file path |
+| `--network <name>` | mainnet \| devnet | mainnet | Solana network to use |
+| `--rpc <url>` | string | — | Custom RPC URL (overrides `--network`) |
+| `--verbose` | boolean | false | Enable per-stage timing and debug output |
+| `--help` | boolean | — | Show command help and exit |
+| `--version` | boolean | — | Show CLI version and exit |
+
+---
+
+## tx command flags
+
+```bash
+opendev tx <signature> [flags]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--no-cache` | boolean | false | Skip the IDL cache and re-fetch from chain |
+
+### Common combinations
+
+```bash
+# Full analysis with timing
+opendev tx <sig> --verbose
+
+# JSON output to file
+opendev tx <sig> --json --output analysis.json
+
+# Custom RPC
+opendev tx <sig> --rpc https://your-rpc.example.com
+
+# Devnet with CSV
+opendev tx <sig> --network devnet --csv --output report.csv
+
+# Bypass IDL cache
+opendev tx <sig> --no-cache --json
+```
+
+---
+
+## simulate command flags
+
+```bash
+opendev simulate <input> [flags]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--no-exec` | boolean | false | Refuse to execute source files (useful in CI) |
+| `--exec-timeout <s>` | number | 90 | Max seconds for the source-file runner |
+
+### Common combinations
+
+```bash
+# Simulate from TypeScript with longer timeout
+opendev simulate ./build_tx.ts --exec-timeout 300
+
+# Strict mode: don't run any scripts
+opendev simulate ./tx.b64 --no-exec
+
+# From source on devnet with JSON output
+opendev simulate ./build_tx.ts --network devnet --json
+
+# Rust project with timing
+opendev simulate ./my-rust-proj --verbose
+```
+
+---
+
+## batch command flags
+
+```bash
+opendev batch <file> [flags]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| (inherits global flags) | — | — | See [Global flags](#global-flags) above |
+
+### Common combinations
+
+```bash
+# CSV to specific path
+opendev batch ./signatures.json --csv --output batch-report.csv
+
+# JSON output (one per line)
+opendev batch ./signatures.json --json > results.jsonl
+
+# Custom RPC
+opendev batch ./signatures.json --rpc https://your-rpc.example.com --csv --output report.csv
+
+# Verbose for debugging
+opendev batch ./signatures.json --verbose
+```
+
+---
+
+## config command flags
+
+Configuration commands don't use typical flags; they accept subcommand-specific arguments.
+
+```bash
+opendev config set-key <provider> <key>
+opendev config get-key [provider]
+opendev config remove-key <provider>
+opendev config set-rpc <url>
+```
+
+---
+
+## Environment variables
+
+Alternative to CLI flags (CLI flags take precedence):
+
+| Variable | Effect |
+|----------|--------|
+| `OPEN_RPC_URL` | Default RPC URL (overridden by `--rpc` flag) |
+| `GROQ_API_KEY` | Groq API key (checked if not in credentials.json) |
+| `ANTHROPIC_API_KEY` | Anthropic API key (checked if not in credentials.json) |
+| `HELIUS_API_KEY` | Helius API key for richer transaction parsing |
+| `OPENDEV_CREDS_PATH` | Path to credentials file (default: `~/.opendev/credentials.json`) |
+| `MCP_ENDPOINT_URL` | POST payload to custom HTTP endpoint instead of LLM |
+| `MCP_DISABLED=1` | Skip AI entirely (rule-based insights only) |
+| `MCP_MODEL` | Override default model for active AI provider |
+
+### Resolution order (AI keys)
+
+1. Shell exports (`GROQ_API_KEY` / `ANTHROPIC_API_KEY`)
+2. `.env` file in installation directory
+3. `~/.opendev/credentials.json` (set by `opendev login` or `opendev config set-key`)
+4. None (only rule-based insights available)
+
+---
+
+## Output modes
+
+### Default (human-readable)
+
+```bash
+opendev tx <sig>
+```
+
+Formatted terminal output with CPI tree, compute units, and insights.
+
+### JSON
+
+```bash
+opendev tx <sig> --json
+```
+
+Full analysis as JSON. Pipe into `jq`:
+
+```bash
+opendev tx <sig> --json | jq '.computeUnits'
+opendev tx <sig> --json | jq '.cpiTree'
+```
+
+### CSV
+
+```bash
+opendev tx <sig> --csv
+opendev tx <sig> --csv --output report.csv
+```
+
+When `--output` is omitted, writes `<signature>.csv` in the current directory.
+
+---
+
+## Timeout handling
+
+### Source file execution
+
+```bash
+# Default: 90 seconds
+opendev simulate ./build_tx.ts
+
+# Longer timeout for slow builds
+opendev simulate ./build_tx.ts --exec-timeout 300
+
+# Strict mode: no execution
+opendev simulate ./build_tx.ts --no-exec
+```
+
+<Warning>
+The first run of a Rust project may be slow due to `cargo build`. Use `--exec-timeout 300` or higher if you hit the 90-second default.
+</Warning>
