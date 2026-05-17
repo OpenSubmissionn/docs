@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "maple",
+  "theme": "mint",
   "name": "opendev",
   "description": "Visual transaction profiler and debugger for Solana",
   "colors": {
@@ -46,6 +46,12 @@
             "pages": [
               "guides/ai-insights"
             ]
+          },
+          {
+            "group": "Help",
+            "pages": [
+              "guides/troubleshooting"
+            ]
           }
         ]
       },
@@ -56,8 +62,7 @@
             "group": "Documentation",
             "pages": [
               "reference/architecture",
-              "reference/project-structure",
-              "reference/troubleshooting"
+              "reference/project-structure"
             ]
           }
         ]
@@ -74,6 +79,11 @@
           "anchor": "NPM",
           "href": "https://www.npmjs.com/package/opendevtool",
           "icon": "npm"
+        },
+        {
+          "anchor": "@OpenDevT",
+          "href": "https://x.com/OpenDevT",
+          "icon": "x-twitter"
         }
       ]
     }
@@ -91,8 +101,8 @@
     ],
     "primary": {
       "type": "button",
-      "label": "Install",
-      "href": "/guides/installation"
+      "label": "Web Version",
+      "href": "https://opendev-tx-solana.vercel.app/"
     }
   },
   "contextual": {
@@ -109,7 +119,8 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/OpenSubmissionn/Open_DevTool"
+      "github": "https://github.com/OpenSubmissionn/Open_DevTool",
+      "x": "https://x.com/OpenDevT"
     }
   }
 }
