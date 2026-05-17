@@ -1,12 +1,21 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
+  "theme": "maple",
   "name": "opendev",
   "description": "Visual transaction profiler and debugger for Solana",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#4B6CB3",
+    "light": "#93B5E1",
+    "dark": "#1E3A8A"
+  },
+  "background": {
+    "color": {
+      "light": "#FFFFFF",
+      "dark": "#05070D"
+    }
+  },
+  "appearance": {
+    "default": "dark"
   },
   "favicon": "/favicon.svg",
   "navigation": {
@@ -59,6 +68,11 @@
           "anchor": "GitHub",
           "href": "https://github.com/OpenSubmissionn/Open_DevTool",
           "icon": "github"
+        },
+        {
+          "anchor": "npm",
+          "href": "https://www.npmjs.com/package/opendevtool",
+          "icon": "npm"
         }
       ]
     }
@@ -73,23 +87,29 @@
         "label": "GitHub",
         "href": "https://github.com/OpenSubmissionn/Open_DevTool"
       }
-    ]
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Install",
+      "href": "/guides/installation"
+    }
   },
   "contextual": {
     "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/OpenSubmissionn/Open_DevTool"
+      "github": "https://github.com/OpenSubmissionn/Open_DevTool",
+      "npm": "https://www.npmjs.com/package/opendevtool"
     }
   }
 }
