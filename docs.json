@@ -11,8 +11,9 @@
   "background": {
     "color": {
       "light": "#FFFFFF",
-      "dark": "#05070D"
-    }
+      "dark": "#0D1530"
+    },
+    "decoration": "gradient"
   },
   "appearance": {
     "default": "dark"
@@ -70,7 +71,7 @@
           "icon": "github"
         },
         {
-          "anchor": "npm",
+          "anchor": "NPM",
           "href": "https://www.npmjs.com/package/opendevtool",
           "icon": "npm"
         }
