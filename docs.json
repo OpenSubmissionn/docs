@@ -108,8 +108,7 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/OpenSubmissionn/Open_DevTool",
-      "npm": "https://www.npmjs.com/package/opendevtool"
+      "github": "https://github.com/OpenSubmissionn/Open_DevTool"
     }
   }
 }
